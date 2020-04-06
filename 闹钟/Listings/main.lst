@@ -1,0 +1,472 @@
+C51 COMPILER V9.54   MAIN                                                                  04/07/2020 06:54:33 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Objects\main.obj
+COMPILER INVOKED BY: D:\keil5 for c51\C51\BIN\C51.EXE app\src\main.c OPTIMIZE(8,SPEED) BROWSE INCDIR(.\app;.\bsp;.\bsp\i
+                    -nc) DEBUG OBJECTEXTEND PRINT(.\Listings\main.lst) TABS(2) OBJECT(.\Objects\main.obj)
+
+line level    source
+
+   1          #include <reg52.h>
+   2          #include "lcd.h"
+   3          #include "e2prom.h"
+   4          
+   5          sbit key1_1s = P2^4;
+   6          sbit key2_1s = P2^5;
+   7          sbit key2_3s = P2^6;
+   8          
+   9          sbit beep = P2^3;
+  10          u8 code time6_lcd[] = {0,1,3,4,6,7};
+  11          u8 code on[] = "c: on ";
+  12          u8 code off[] = "c: off";
+  13          
+  14          struct Time;
+  15          struct Time_Params;
+  16          
+  17          
+  18          //-------------------------struct-----------------------------
+  19          struct Time
+  20          {
+  21            u8 hour;
+  22            u8 min;
+  23            u8 sec;
+  24          };
+  25          
+  26          struct Time_Params
+  27          {
+  28            u8 clock_act;
+  29            int time_pos;
+  30            u8 time_sta[2];
+  31            u8 time6[6];
+  32            struct Time cur_time;
+  33            struct Time clo_time;
+  34          };
+  35          
+  36          struct Time_Params time = {0,5,{0},{0},{0,0,0},{0,0,0}};
+  37          
+  38          //------------------------------------------------------------
+  39          
+  40          //-------------------------function--------------------------
+  41          void write_sfm(u8 loc, u8 num)
+  42          {
+  43   1        lcd_write_data(num + '0');
+  44   1        lcd_write_com(0x80 + 0x40 + loc);
+  45   1      }
+  46          
+  47          void preprocess(u8 *time6)
+  48          {
+  49   1        u8 i;
+  50   1        if((time6[0]*10 + time6[1]) >= 24)
+  51   1        {
+  52   2          time6[0] = 0;
+  53   2          time6[1] = 0;
+  54   2        }
+C51 COMPILER V9.54   MAIN                                                                  04/07/2020 06:54:33 PAGE 2   
+
+  55   1        for(i=2; i<5; i=i+2)  //min, sec
+  56   1          time6[i] = (time6[i] > 5 ? 5 : time6[i]);
+  57   1      }
+  58          
+  59          void time6_time(struct Time *pt, u8* time6)
+  60          {
+  61   1        preprocess(time6);
+  62   1        pt->sec = time6[4] * 10 + time6[5];
+  63   1        pt->min = time6[2] * 10 + time6[3];
+  64   1        pt->hour = time6[0] * 10 + time6[1];
+  65   1      }
+  66          
+  67          void time_time6(struct Time t, u8* time6)
+  68          {
+  69   1        time6[5] = t.sec % 10;
+  70   1        time6[4] = t.sec / 10;
+  71   1        time6[3] = t.min % 10;
+  72   1        time6[2] = t.min / 10;
+  73   1        time6[1] = t.hour % 10;
+  74   1        time6[0] = t.hour / 10;
+  75   1      }
+  76          
+  77          void delayms(u16 z)
+  78          {
+  79   1         u16 x,y;
+  80   1         for(x=z;x>0;x--)
+  81   1          for(y=110;y>0;y--); 
+  82   1      }
+  83          
+  84          void keyscan()
+  85          {
+  86   1        u8 i, j, tmp;
+  87   1        u16 cnt = 0;
+  88   1        for(i=0; i<2; i++)
+  89   1        {
+  90   2          P1 = ~(0x01 << i);
+  91   2          tmp = 0x10;
+  92   2          for(j=0; j<4; j++)
+  93   2          {
+  94   3            tmp = (~(0x10 << j)) & 0xf0;
+  95   3            if((P1 & 0xf0) == tmp)
+  96   3            {
+  97   4              delayms(5);
+  98   4              if((P1 & 0xf0) == tmp)
+  99   4              {
+ 100   5                beep = 1;
+ 101   5                if(time.time_sta[0] | time.time_sta[1]) //set cur_time  0~7
+ 102   5                {
+ 103   6                  time.time6[time.time_pos] = j + i*4;
+ 104   6                  write_sfm(time6_lcd[time.time_pos], j + i*4);
+ 105   6                }
+ 106   5              }
+ 107   4              while((P1 & 0xf0) == tmp);
+ 108   4              beep = 0;
+ 109   4            }
+ 110   3          }
+ 111   2        }
+ 112   1        P1 = 0xfb; 
+ 113   1        delayms(1);
+ 114   1        for(j=0; j<2; j++)
+ 115   1        {
+ 116   2          tmp = (~(0x10 << j)) & 0xf0;
+C51 COMPILER V9.54   MAIN                                                                  04/07/2020 06:54:33 PAGE 3   
+
+ 117   2          if((P1 & 0xf0) == tmp)
+ 118   2          {
+ 119   3            delayms(5);
+ 120   3            if((P1 & 0xf0) == tmp)
+ 121   3            {
+ 122   4              beep = 1;
+ 123   4              if(time.time_sta[0] | time.time_sta[1]) //set cur_time  8~9
+ 124   4              {
+ 125   5                time.time6[time.time_pos] = j + 8;
+ 126   5                write_sfm(time6_lcd[time.time_pos], j+8);
+ 127   5              }
+ 128   4            }
+ 129   3            while((P1 & 0xf0) == tmp);
+ 130   3            beep = 0;
+ 131   3          }
+ 132   2        }
+ 133   1      
+ 134   1        switch(P1 & 0xf0) // ??1??
+ 135   1        {
+ 136   2          case 0xb0:
+ 137   2          {
+ 138   3            delayms(5);
+ 139   3            if((P1 & 0xf0) == 0xb0)
+ 140   3            {
+ 141   4              beep = 1;
+ 142   4              if(time.time_sta[0] || time.time_sta[1])  
+ 143   4              {
+ 144   5                tmp = (time.time6[time.time_pos] < 9 ? ++time.time6[time.time_pos] 
+ 145   5                : time.time6[time.time_pos]);
+ 146   5                write_sfm(time6_lcd[time.time_pos], tmp);
+ 147   5              }
+ 148   4            }
+ 149   3            while((P1 & 0xf0) == 0xb0);
+ 150   3            beep = 0;
+ 151   3            break;
+ 152   3          }
+ 153   2          case 0x70:
+ 154   2          {
+ 155   3            delayms(5);
+ 156   3            if((P1 & 0xf0) == 0x70)
+ 157   3            {
+ 158   4              beep = 1;
+ 159   4              if(time.time_sta[0] || time.time_sta[1])  
+ 160   4              {
+ 161   5                tmp = (time.time6[time.time_pos] > 0 ? --time.time6[time.time_pos]
+ 162   5                : time.time6[time.time_pos]);
+ 163   5                write_sfm(time6_lcd[time.time_pos], tmp);
+ 164   5              }
+ 165   4            }
+ 166   3            while((P1 & 0xf0) == 0x70);
+ 167   3            beep = 0;
+ 168   3            break;
+ 169   3          }
+ 170   2        }
+ 171   1        P1 = 0xf7;
+ 172   1        delayms(1);
+ 173   1        switch(P1 & 0xf0)
+ 174   1        {
+ 175   2          case 0xe0:  //change position
+ 176   2          {
+ 177   3            delayms(5);
+ 178   3            if((P1 & 0xf0) == 0xe0)
+C51 COMPILER V9.54   MAIN                                                                  04/07/2020 06:54:33 PAGE 4   
+
+ 179   3            {
+ 180   4              beep = 1;
+ 181   4              if(time.time_sta[0] | time.time_sta[1])
+ 182   4                time.time_pos = (time.time_pos + 1) % 6;
+ 183   4              lcd_write_com(0x0c);
+ 184   4              lcd_write_com(0x80 + 0x40 + time6_lcd[time.time_pos]);
+ 185   4              lcd_write_com(0x0f);
+ 186   4            }
+ 187   3            while((P1 & 0xf0) == 0xe0);
+ 188   3            beep = 0;
+ 189   3            break;
+ 190   3          }
+ 191   2          case 0xd0:
+ 192   2          {
+ 193   3            delayms(5);
+ 194   3            if((P1 & 0xf0) == 0xd0)
+ 195   3            {
+ 196   4              beep = 1;
+ 197   4              if(time.time_sta[0] | time.time_sta[1])
+ 198   4                time.time_pos = ((--time.time_pos) < 0 ? 5 : time.time_pos);
+ 199   4              lcd_write_com(0x0c);
+ 200   4              lcd_write_com(0x80 + 0x40 + time6_lcd[time.time_pos]);
+ 201   4              lcd_write_com(0x0f);
+ 202   4            }
+ 203   3            while((P1 & 0xf0) == 0xd0);
+ 204   3            beep = 0;
+ 205   3            break;
+ 206   3          }
+ 207   2          case 0xb0:  //funtion key 1: set time
+ 208   2          {
+ 209   3            delayms(5);
+ 210   3            if((P1 & 0xf0) == 0xb0)
+ 211   3            {
+ 212   4              beep = 1;
+ 213   4              if(time.time_sta[1] == 0)
+ 214   4              {
+ 215   5                while((P1 & 0xf0) == 0xb0)
+ 216   5                {
+ 217   6                  delayms(1);
+ 218   6                  cnt++;
+ 219   6                  if(cnt >= 1000)   key1_1s = 1;
+ 220   6                }
+ 221   5                key1_1s = 0;
+ 222   5                
+ 223   5                if(time.time_sta[0])
+ 224   5                {
+ 225   6                  time.time_sta[0] = 0;
+ 226   6                  time.time_pos = 5;
+ 227   6                  lcd_write_com(0x0c);
+ 228   6                  if(cnt < 1000)  //press 1           
+ 229   6                    time6_time(&time.cur_time, time.time6); // count time
+ 230   6      
+ 231   6                  TR0 = 1;
+ 232   6                }
+ 233   5                else
+ 234   5                {
+ 235   6                  TR0 = 0;
+ 236   6                  time_time6(time.cur_time, time.time6);
+ 237   6                  time.time_sta[0]++;
+ 238   6                  lcd_write_com(0x80 + 0x40 + time6_lcd[time.time_pos]);
+ 239   6                  lcd_write_com(0x0f);
+ 240   6                }
+C51 COMPILER V9.54   MAIN                                                                  04/07/2020 06:54:33 PAGE 5   
+
+ 241   5              }
+ 242   4              beep = 0;
+ 243   4                
+ 244   4            }
+ 245   3            break;
+ 246   3          }
+ 247   2          case 0x70:  //function key2 : set clock
+ 248   2          {
+ 249   3            delayms(5);
+ 250   3            if((P1 & 0xf0) == 0x70)
+ 251   3            {
+ 252   4              beep = 1;
+ 253   4              if(time.time_sta[0] == 0)
+ 254   4              {
+ 255   5                
+ 256   5                while((P1 & 0xf0) == 0x70)
+ 257   5                {
+ 258   6                  delayms(1);
+ 259   6                  cnt++;
+ 260   6                  if(cnt > 1000)
+ 261   6                    key2_1s = 1;
+ 262   6                  if(cnt > 3000)
+ 263   6                    key2_3s = 1;
+ 264   6                }
+ 265   5                key2_1s = 0;
+ 266   5                key2_3s = 0;
+ 267   5                if(cnt > 3000)    //press very long --> activate or deactivate clock 
+ 268   5                {
+ 269   6                  time.clock_act = (~time.clock_act) & 0x01;
+ 270   6                  if(time.clock_act)
+ 271   6                    lcd_write_str(2, 10, on);
+ 272   6                  else
+ 273   6                    lcd_write_str(2, 10, off);
+ 274   6                  time.time_sta[1] = 0;
+ 275   6                  time.time_pos = 5;
+ 276   6                  lcd_write_com(0x0c);
+ 277   6                  TR0 = 1;
+ 278   6                }
+ 279   5                else
+ 280   5                {
+ 281   6                  if(time.time_sta[1])  //reset and count
+ 282   6                  {
+ 283   7                    time.time_sta[1] = 0;
+ 284   7                    time.time_pos = 5;
+ 285   7                    lcd_write_com(0x0c);
+ 286   7                    if(cnt < 1000)    //press last for 1s, cansel set time
+ 287   7                      time6_time(&time.clo_time, time.time6);
+ 288   7      
+ 289   7                    TR0 = 1;
+ 290   7                  }
+ 291   6                  else
+ 292   6                  {
+ 293   7                    TR0 = 0;
+ 294   7                    time_time6(time.cur_time, time.time6);
+ 295   7                    time.time_sta[1]++;
+ 296   7                    lcd_write_com(0x80 + 0x40 + time6_lcd[time.time_pos]);
+ 297   7                    lcd_write_com(0x0f);
+ 298   7                    
+ 299   7                  }
+ 300   6                }
+ 301   5                
+ 302   5              }
+C51 COMPILER V9.54   MAIN                                                                  04/07/2020 06:54:33 PAGE 6   
+
+ 303   4              beep = 0;
+ 304   4            }
+ 305   3            break;
+ 306   3          }
+ 307   2        }
+ 308   1        
+ 309   1      }
+ 310          
+ 311          void write_time(struct Time time)
+ 312          {
+ 313   1        u8 dat[9];
+ 314   1        dat[0] = time.hour/10 + '0';
+ 315   1        dat[1] = time.hour%10 + '0';
+ 316   1        dat[2] = ':';
+ 317   1        dat[3] = time.min/10 + '0';
+ 318   1        dat[4] = time.min%10 + '0';
+ 319   1        dat[5] = ':';
+ 320   1        dat[6] = time.sec/10 + '0';
+ 321   1        dat[7] = time.sec%10 + '0';
+ 322   1        dat[8] = '\0';
+ 323   1        lcd_write_str(2, 1, dat);
+ 324   1      
+ 325   1      }
+ 326          
+ 327          
+ 328          u8 th0, tl0;
+ 329          void configTimer0(u16 xms) 
+ 330          {
+ 331   1        TMOD = 0x01;
+ 332   1        th0 = (65536 - 1000 * xms) >> 8;
+ 333   1        tl0 = (65536 - 1000 * xms) % 256;
+ 334   1        TH0 = th0;
+ 335   1        TL0 = tl0;
+ 336   1        EA = 1;
+ 337   1        ET0 = 1;
+ 338   1        TR0 = 1;
+ 339   1      }
+ 340          
+ 341          //------------------------------------------------------------
+ 342          //-----------------------------main----------------------------
+ 343          void main()
+ 344          {
+ 345   1        u8 first_time;
+ 346   1        u8 beeptime = 100;  //10s
+ 347   1        u8 code date[] = "2020-4-3 Fri";
+ 348   1        beep = 0;
+ 349   1        key1_1s = 0;
+ 350   1        key2_1s = 0;
+ 351   1        key2_3s = 0;
+ 352   1        lcd_init();
+ 353   1        e2p_init();
+ 354   1        lcd_write_str(1,2,date);
+ 355   1        lcd_write_str(2, 10, off);
+ 356   1        first_time = e2p_read_data(0);
+ 357   1        if(first_time != 'a')
+ 358   1        {
+ 359   2          e2p_write_data(0, 'a');
+ 360   2          e2p_write_data(1, time.cur_time.hour);
+ 361   2          e2p_write_data(2, time.cur_time.min);
+ 362   2          e2p_write_data(3, time.cur_time.sec);
+ 363   2        }
+ 364   1        else
+C51 COMPILER V9.54   MAIN                                                                  04/07/2020 06:54:33 PAGE 7   
+
+ 365   1        {
+ 366   2          time.cur_time.hour = e2p_read_data(1);
+ 367   2          time.cur_time.min = e2p_read_data(2);
+ 368   2          time.cur_time.sec = e2p_read_data(3);
+ 369   2        }
+ 370   1        write_time(time.cur_time);
+ 371   1        
+ 372   1        configTimer0(50);
+ 373   1        while(1)
+ 374   1        {
+ 375   2          keyscan();
+ 376   2          if(time.clock_act)
+ 377   2          {
+ 378   3            if((time.cur_time.hour == time.clo_time.hour)
+ 379   3              && (time.cur_time.min == time.clo_time.min) 
+ 380   3            && (time.cur_time.sec == time.clo_time.sec))
+ 381   3            {
+ 382   4              TR0 = 0;
+ 383   4              beep = 1;
+ 384   4              while(beeptime--) delayms(50);
+ 385   4              beep = 0;
+ 386   4              beeptime = 100;
+ 387   4              TR0 = 1;
+ 388   4              time.clock_act = 0;
+ 389   4              lcd_write_str(2, 10, off);
+ 390   4            }
+ 391   3          }
+ 392   2        }
+ 393   1          
+ 394   1      }
+ 395          
+ 396          void int0() interrupt 1
+ 397          {
+ 398   1        static u8 cnt = 0;
+ 399   1        
+ 400   1        if(++cnt == 20) //1s
+ 401   1        {
+ 402   2          cnt = 0;
+ 403   2          time.cur_time.sec++;
+ 404   2          e2p_write_data(3,time.cur_time.sec);
+ 405   2          if(time.cur_time.sec >= 60)
+ 406   2          {
+ 407   3            time.cur_time.sec = 0;
+ 408   3            time.cur_time.min++;
+ 409   3            if(time.cur_time.min >= 60)
+ 410   3            {
+ 411   4              time.cur_time.min = 0;
+ 412   4              time.cur_time.hour++;
+ 413   4              if(time.cur_time.hour >= 24)
+ 414   4                time.cur_time.hour = 0;
+ 415   4              e2p_write_data(1, time.cur_time.hour);
+ 416   4            }
+ 417   3            e2p_write_data(2, time.cur_time.min);
+ 418   3            
+ 419   3          }
+ 420   2          write_time(time.cur_time);
+ 421   2        }
+ 422   1      
+ 423   1        TH0 = th0;
+ 424   1        TL0 = tl0;
+ 425   1      }
+ 426          
+C51 COMPILER V9.54   MAIN                                                                  04/07/2020 06:54:33 PAGE 8   
+
+ 427          
+ 428          
+ 429          
+ 430          
+ 431          
+ 432          
+ 433          
+ 434          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1848    ----
+   CONSTANT SIZE    =     33    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     20      36
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

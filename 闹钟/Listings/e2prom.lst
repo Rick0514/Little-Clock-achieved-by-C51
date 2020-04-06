@@ -1,0 +1,154 @@
+C51 COMPILER V9.54   E2PROM                                                                04/07/2020 06:54:09 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE E2PROM
+OBJECT MODULE PLACED IN .\Objects\e2prom.obj
+COMPILER INVOKED BY: D:\keil5 for c51\C51\BIN\C51.EXE bsp\src\e2prom.c OPTIMIZE(8,SPEED) BROWSE INCDIR(.\app;.\bsp;.\bsp
+                    -\inc) DEBUG OBJECTEXTEND PRINT(.\Listings\e2prom.lst) TABS(2) OBJECT(.\Objects\e2prom.obj)
+
+line level    source
+
+   1          #include "e2prom.h"
+   2          
+   3          //AT24C512 driver---------------------
+   4          void e2p_delay()  //5us
+   5          {
+   6   1        _nop_();
+   7   1        _nop_();
+   8   1        _nop_();
+   9   1        _nop_();
+  10   1        _nop_();
+  11   1      }
+  12          
+  13          void e2p_delayms(u16 z)
+  14          {
+  15   1         u16 x,y;
+  16   1         for(x=z;x>0;x--)
+  17   1          for(y=110;y>0;y--); 
+  18   1      }
+  19          
+  20          void e2p_init()
+  21          {
+  22   1        SDA = 1;
+  23   1        e2p_delay();
+  24   1        SCL = 1;
+  25   1        e2p_delay();
+  26   1      }
+  27          
+  28          void e2p_start()
+  29          {
+  30   1        SDA = 1;
+  31   1        e2p_delay();
+  32   1        SCL = 1;
+  33   1        e2p_delay();
+  34   1        SDA = 0;
+  35   1        e2p_delay();
+  36   1      }
+  37          
+  38          void e2p_stop()
+  39          {
+  40   1        SDA = 0;
+  41   1        e2p_delay();
+  42   1        SCL = 1;
+  43   1        e2p_delay();
+  44   1        SDA = 1;
+  45   1        e2p_delay();
+  46   1      }
+  47          
+  48          void e2p_at_ack()
+  49          {
+  50   1        u8 i;
+  51   1        SCL = 1;
+  52   1        e2p_delay();
+  53   1        while((SDA == 1) && (i++ < 50)){};
+  54   1        SCL = 0;
+C51 COMPILER V9.54   E2PROM                                                                04/07/2020 06:54:09 PAGE 2   
+
+  55   1        e2p_delay();
+  56   1      }
+  57          
+  58          void e2p_write_byte(u8 dat)
+  59          {
+  60   1        u8 mask;
+  61   1        for(mask = 0x80; mask != 0; mask >>= 1)
+  62   1        {
+  63   2          SCL = 0;
+  64   2          e2p_delay();
+  65   2          if(mask & dat)
+  66   2            SDA = 1;
+  67   2          else
+  68   2            SDA = 0;
+  69   2          e2p_delay();
+  70   2          SCL = 1;
+  71   2          e2p_delay();
+  72   2        } 
+  73   1        SCL = 0;
+  74   1        e2p_delay();
+  75   1        SDA = 1;
+  76   1        e2p_delay();
+  77   1      }
+  78          
+  79          u8 e2p_read_byte()
+  80          {
+  81   1        u8 dat = 0;
+  82   1        u8 i;
+  83   1        SCL = 0;
+  84   1        e2p_delay();
+  85   1        SDA = 1;
+  86   1        e2p_delay();
+  87   1        for(i = 0; i < 8; i++)
+  88   1        {
+  89   2          SCL = 1;
+  90   2          e2p_delay();
+  91   2          dat = ((dat << 1) | SDA);
+  92   2          SCL = 0;
+  93   2          e2p_delay();
+  94   2        }
+  95   1        return dat;
+  96   1      }
+  97          
+  98          void e2p_write_data(u8 addr, u8 dat)
+  99          {
+ 100   1        u8 com = 0xa0;
+ 101   1        e2p_start();
+ 102   1        e2p_write_byte(com);
+ 103   1        e2p_at_ack();
+ 104   1        e2p_write_byte(addr);
+ 105   1        e2p_at_ack();
+ 106   1        e2p_write_byte(dat);
+ 107   1        e2p_at_ack();
+ 108   1        e2p_stop();
+ 109   1        e2p_delayms(1);
+ 110   1      }
+ 111          
+ 112          u8 e2p_read_data(u8 addr)
+ 113          {
+ 114   1        u8 dat;
+ 115   1        e2p_start();
+ 116   1        e2p_write_byte(0xa0);
+C51 COMPILER V9.54   E2PROM                                                                04/07/2020 06:54:09 PAGE 3   
+
+ 117   1        e2p_at_ack();
+ 118   1        e2p_write_byte(addr);
+ 119   1        e2p_at_ack();
+ 120   1        e2p_start();
+ 121   1        e2p_write_byte(0xa1);
+ 122   1        e2p_at_ack();
+ 123   1        dat = e2p_read_byte();
+ 124   1        e2p_stop();
+ 125   1        return dat;
+ 126   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    243    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----       1
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
